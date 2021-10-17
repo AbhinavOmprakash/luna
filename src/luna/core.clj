@@ -1,5 +1,6 @@
 (ns luna.core
-  (:import (java.util.regex Pattern))
+  (:import (java.util.regex Pattern)
+           (clojure.lang PersistentVector Keyword))
   (:require [clojure.set :as s]
             [clojure.string :as string]))
 
@@ -32,8 +33,11 @@
                              :atmost
                              :between
                              :lazily
+                             :lazily-1
                              :greedily
-                             :possessively})
+                             :greedily-1
+                             :possessively
+                             :0-or-1})
 
 
 (def ^:private groups #{:before
@@ -68,11 +72,20 @@
 (defmethod add-quantifier :lazily
   ([_ char] [char "*?"]))
 
+(defmethod add-quantifier :lazily-1
+  ([_ char] [char "+?"]))
+
 (defmethod add-quantifier :greedily
-  ([_ char] [char "?"]))
+  ([_ char] [char "*"]))
+
+(defmethod add-quantifier :greedily-1
+  ([_ char] [char "+"]))
 
 (defmethod add-quantifier :possessively
   ([_ char] [char "*+"]))
+
+(defmethod add-quantifier :0-or-1
+  ([_ char] [char "?"]))
 
 (defmulti ^:private add-group (fn
                                 ([group & _] group)))
@@ -130,9 +143,18 @@
           (#(str "[^" % "]"))))))
 
 (defn- single-token [[t]]
-  (if (string? t)
+  (cond
+    (string? t)
     [t]
-    [(get char-classes t)]))                                ; else t is keyword and translate it to regex
+
+    (keyword? t)
+    (if (= :or t)
+      "|"
+      [(get char-classes t)])
+
+    (int? t)
+    [(str t)]))
+
 
 (defn- quant-tokens [t]
   (cond
@@ -144,7 +166,7 @@
     (some #{:atleast :atmost} t)
     (vector (first t)
             (add-quantifier (nth t 1) (nth t 2)))
-    (some #{:lazily :greedily :possessively} t)
+    (some quantifiers t)
     (add-quantifier (t 1) (t 0))))
 
 
@@ -156,13 +178,15 @@
   [[char & rem]]
   (let [anchor (first (s/intersection anchors (set rem)))
         quantifier (first (s/intersection quantifiers (set rem)))
-        quantifier1 (first (drop-while (complement int?) rem))
+        quantifier1 (first (filter int? rem))
 
-        quantifier2 (first (drop-while (complement int?) (drop-while (complement int?) rem))) ; for between
-        char-with-anchor (first (anchor-tokens [char :when anchor]))]
-    (if (= :between quantifier)
-      (quant-tokens [char-with-anchor quantifier quantifier1 :and quantifier2])
-      (quant-tokens [char-with-anchor quantifier quantifier1]))))
+        quantifier2 (second (filter int? rem))              ; for between
+        ; order is important. quantifiers must be added before anchors
+        char-with-quant (if (= :between quantifier)
+                          (quant-tokens [char quantifier quantifier1 :and quantifier2])
+                          (quant-tokens [char quantifier quantifier1]))
+        char-with-anchor (first (anchor-tokens [(apply str char-with-quant) :when anchor]))]
+    char-with-anchor))
 
 (defn- common?
   "checks if there are common elements in x and y"
@@ -172,17 +196,18 @@
     (seq (s/intersection (set x) (set y)))))
 
 (defn- should-be-match-enclosed? [type chars mods]
-  (if (= :match-enc type) false
-                          (if (and (common? quantifiers (flatten chars))
-                                   (common? quantifiers mods))
-                            (if (some #{:between} mods)
-                              ; if not int then it is a lookahead or lookbehind and not a quantifier.
-                              ; since :between is used for that too.
-                              (if (int? (second mods))
-                                true
-                                false)
-                              true)
-                            false)))
+  (if (= :match-enc type)
+    false
+    (if (and (common? quantifiers (flatten chars))
+             (common? quantifiers mods))
+      (if (some #{:between} mods)
+        ; if not int then it is a lookahead or lookbehind and not a quantifier.
+        ; since :between is used for that too.
+        (if (int? (second mods))
+          true
+          false)
+        true)
+      false)))
 
 (defn- tokenize-chars [chars]
   (reduce (fn [res char]
@@ -193,11 +218,21 @@
               (instance? Pattern char)
               (conj res [(str char)])
 
+              (= :or char)
+              (conj res [char])
+
               (vector? char)
               (conj res [char])
 
               (contains? char-classes char)
               (conj res [(char char-classes)])
+
+              (and (int? char)
+                   (not (common? #{:atleast :atmost :between} (last res))))
+              ; if the previous token contains a quantifier,
+              ; that means this int belongs inside that,
+              ; else it is separate token
+              (conj res [char])
 
               :else (conj (vec (butlast res))
                           (conj (last res) char))))
@@ -211,25 +246,37 @@
     (and (common? anchors t) (common? quantifiers t))
     (anchor-and-quant-tokens t)
 
+    (and (common? #{:to} (first t)) (common? quantifiers t))
+    (quant-tokens (vec (cons (str "[" (ffirst t) "-" (last (first t)) "]")
+                             (rest t))))
+
     (common? anchors t)
     (anchor-tokens t)
 
     (common? quantifiers t)
     (quant-tokens t)
 
-    (some #{:to} (first t))
+    (common? #{:to} (first t))
     ; todo consider moving to a fn for aesthetics?
     [(str "[" (ffirst t) "-" (last (first t)) "]")]
 
-    (vector? (first t))
+    (and (= (count t) 1)
+         (not (vector? (first t))))
+    (single-token t)
+
+    (vector? (first t))                                     ; if the char vec is nested for e.g [["a" "b"]] => #"[ab]"
     (->> (first t)
          tokenize-chars
          (map token->rtoken)
          (map (partial apply str))
-         (apply str))
-
-    (= (count t) 1)
-    (single-token t)))
+         (apply str)
+         ((fn [char]                                        ;fn to remove nested ranges, since it changes the meaning. [[0-9][A-B]] => [0-9A-b]
+            (if (string/includes? char "[")
+              (-> char
+                  (string/replace "[" "")
+                  (string/replace "]" ""))
+              char)))
+         (#(str "[" % "]")))))
 
 
 (defmulti ^:private rtokens->str (fn [type _] type))
@@ -238,26 +285,26 @@
 
 (defmethod rtokens->str :match [_ chars]
   (->> chars
-       (interpose "|")
        (apply str)))
 
 (defmethod rtokens->str :c [_ chars] (rtokens->str :capture chars))
 
 (defmethod rtokens->str :capture [_ chars]
   (->> chars
-       (interpose "|")
        (apply str)
        (#(str "(" % ")"))))
 
 (defmethod rtokens->str :match-enc [_ chars]
   (->> chars
-       (interpose "|")
        (apply str)
        (#(str "(?:" % ")"))))
 
 (defn- add-mods [mods x]
   (if (seq mods)
     (cond
+      (#{:lazily :greedily :possessively} (first mods))
+      (add-mods (rest mods) (apply str (add-quantifier (first mods) x)))
+
       (and (common? groups mods)
            (some string? mods))
       (if (some #{:between} mods)
@@ -291,27 +338,30 @@
             mod))
         mods))
 
-(defmulti ^:private regify
-          "Takes in a string, regex.Pattern or a vector with the Luna DSL.
-          If a regex.Pattern is passed then it will be converted to a string.
-          If a vector is passed, it will be evaluated to form a string.
-          Returns a string."
-
-          (fn [x]
-            (if (vector? x)
-              (type (first x))
-              (type x))))
-
-(defmethod regify String [x] x)
-
-(defmethod regify Pattern [x] (str x))
-
 (defn- handle-set
   [chars]
   (let [set-action (if (some #{:not} chars) :not :and)]
     (add-set-action set-action chars)))
 
-(defmethod regify clojure.lang.Keyword [[type chars & mods]]
+(defmulti ^:private regify
+          "Takes in a string, regex.Pattern or a vector with the Luna DSL.
+          If a regex.Pattern is passed then it will be converted to a string.
+          If a vector is passed, it will be evaluated to form a string.
+          Returns a string."
+          (fn [x]
+            (type x)))
+
+(defmethod regify String [x] x)
+
+(defmethod regify Pattern [x] (str x))
+
+(defmethod regify Keyword [x]
+  (if (= :or x)
+    "|"
+    (throw (IllegalArgumentException. "unrecognized argument.\nDid you mean :or ?"))))
+
+
+(defmethod regify PersistentVector [[type chars & mods]]
   (cond
     (should-be-match-enclosed? type chars mods)
     (regify (vec (cons :match-enc (cons chars mods))))
