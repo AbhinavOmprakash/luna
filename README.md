@@ -44,7 +44,7 @@ differently.
 
 ### Refactoring
 
-I welcome refactorings like
+I welcome refactors like
 
 - Variable and function renaming.
 - Extracting functions.
