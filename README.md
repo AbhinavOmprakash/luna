@@ -4,8 +4,8 @@ No more regrets, wield the power of regex with the readability of English with l
 
 # About
 
-luna is a Domain specific language (DSL) that is readable and translates into a Regex.Pattern. luna is still in Beta but
-don't let this discourage you from using it, it has a good test suite and bug reports are key to improving it.
+luna is a Domain specific language (DSL) that is readable and translates into a `Regex.Pattern` object. luna is still in
+Beta but don't let this discourage you from using it, it has a good test suite and bug reports are key to improving it.
 
 # Why?
 
@@ -92,26 +92,25 @@ examples of valid char-class vector
 
 ;; using anchors inside vector
 ["x" :when :at-start] => #"^x"
-["x" :when :at-start "y"] => #"^x|y"
+["x" :when :at-start "y"] => #"^xy"
 
 ;; using quantifiers inside vector
-["x" :atleast 5 :times "y"] => #"x{5,}|y"
+["x" :atleast 5 :times "y"] => #"x{5,}y"
 
 ;; the :times can be omitted but helps with readability
-["x" :atleast 5 "y"] => #"x{5,}|y"
+["x" :atleast 5 "y"] => #"x{5,}y"
 
 ;;combining anchors and quantifiers
-["x" :atleast 5 :times :when :at-start "y"] => #"^x{5,}|y"
+["x" :atleast 5 :times :when :at-start "y"] => #"^x{5,}y"
 ```
 
 # after the character class vector we have modifiers.
 
 ```clojure
 ;;             -modifiers-
-[:match ["xy"] :atleast 2] => #"[xy]{2,}"
+[:match ["xy"] :atleast 2] => #"xy{2,}"
 ;;             ---modifiers---
-[:match ["xy"] :when :at-start] => #"^[xy]"
-[:match "xy" :when :at-start] => #"^xy"
+[:match ["xy"] :when :at-start] => #"^xy"
 
 ```
 
@@ -132,7 +131,7 @@ instead if you want `#"(?:x{5}|y)`
 use :match-enc
 
 ```clojure
-[:match-enc ["x" :atleast 5 "y"]] => #"(?:x{5}|y)"
+[:match-enc ["x" :atleast 5 "y"]] => #"(?:x{5}y)"
 ```
 
 # sets
@@ -164,8 +163,8 @@ the syntax of capture is similar to `:match`
 ```clojure
 [:match "x" :when :at-start] ; #"^x"
 [:match "xy" :when :at-start] ; #"^xy"
-[:match ["xy"] :when :at-start] ; #"^[xy]"
-[:match ["x" :or "y"] :when :at-start] ; #"^[x|y]"
+[:match ["xy"] :when :at-start] ; #"^xy"
+[:match ["x" :or "y"] :when :at-start] ; #"^x|y"
 [:match ["x" :when :at-start :or "y"]] ; #"^x|y"
 
 [:match [:digits] :when :at-end] ; #"\d$"
@@ -176,11 +175,12 @@ the syntax of capture is similar to `:match`
 ```clojure
 [:capture "x" :when :at-start] ; #"^(x)"
 [:capture "xy" :when :at-start] ; #"^(xy)"
-[:capture ["x" "y"] :when :at-start] ; #"^(x|y)"
+[:capture ["x" "y"] :when :at-start] ; #"^(xy)"
+[:capture [["x" "y"]] :when :at-start] ; #"^([xy])"
 
 [:capture :digits :when :at-end] ; #"$(\d)"
 [:capture "x" :when :at-word-start] ; #"\b(x)"
-[:caputre "x" :when :not :at-word-start] ; #"\B(x)"
+[:capture "x" :when :not :at-word-start] ; #"\B(x)"
 ```
 
 ## Group constructs
@@ -198,6 +198,8 @@ the syntax of capture is similar to `:match`
 
 ;; both can be combined
 [:match "y" :between "x" :and "z"]  ; #"(?<=x)y(?=z)"
+[:match "y" :between "x" :and :not "z"]  ; #"(?<=x)y(?!z)"
+[:match "y" :between :not "x" :and :not "z"]  ; #"(?<!x)y(?!z)"
 ```
 
 # Quantifiers
@@ -205,79 +207,67 @@ the syntax of capture is similar to `:match`
 note: the `:times` can be omitted if you want but it helps with readability
 
 ```clojure
-[:match "xyz" :atleast-zero] ; #"xyz*"
-[:match ["xyz"] :greedily] ; #"[xyz]*"
-[:match ["xyz"] :lazily] ; #"xyz*?"
+[:match "xyz" :lazily] ; #"xyz*?"
+[:match ["xyz"] :lazily-1] ; #"xyz+?"
 
-[:capture ["x"] :with-name "foo"] ; #"(?<foo>x)"
-[:match ["x"] :atleast 3 :times] ;
-[:match ["x"] :atleast 3] ;
+[:match ["xyz"] :greedily] ; #"xyz*"
+[:match ["xyz"] :greedily-1] ; #"xyz+"
 
-[:match ["x"] :atmost 3 :times] ;
+[:match ["xyz"] :possessively] ; #"xyz*+"
+
+[:match ["x"] :atleast 3 :times] ; #"x{3,}"
+[:match ["x"] :atleast 3] ; #"x{3,}"
+
+[:match ["x"] :atmost 3 :times] ; #"x{0,3}"
 
 ;; Combining both
-[:match ["x"] :atleast 3 :atmost 5 :times] ;
-[:match ["x"] :between 3 :to 5 :times] ; 
+[:match ["x"] :atleast 3 :atmost 5 :times] ; #"x{3,5}
+[:match ["x"] :between 3 :to 5 :times] ;  #"x{3,5}
 ```
 
-# recipes
-
-## validating email
-
-### simple check
+# A few practical examples
 
 ```clojure
 #"^\S+@\S+$" ;regex
 
-(pre
-  [:m [:!space :atleast 1 :when :at-start]] "@" [:m [:!space :atleast 1 :when :at-end]])
-
-
+(pre [:m [:!spaces :greedily-1 :when :at-start
+          "@" :!spaces :greedily-1 :when :at-end]])
 ```
 
 ```clojure
 #"^[A-Z0-9+_.-]+@[A-Z0-9.-]+$"
 
-;pretty-regex
-(pre
-  [:match [:alpha :digits "+_.-"] :atleast 1 :when :at-start]
-  "@"
-  [:match [:alpha :digits ".-"] :atleast 1 :when :at-end])
+(pre [:m [[["A" :to "Z"] [0 :to 9] "+_.-"]] :greedily-1 :when :at-start]
+     "@"
+     [:m [[["A" :to "Z"] [0 :to 9] ".-"]] :greedily-1 :when :at-end])
 
 #"^([0-9]{4})-(1[0-2]|0[1-9])"
 
-(pre
-  [:capture [:digits 4 :times] :when :at-start] "-" [:capture [1 [0 :to 2] :or [0 [0 :to 9]]]])
+
+(pre [:c [[0 :to 9] :atleast 4] :when :at-start]
+     "-"
+     [:c [1 [0 :to 2] :or 0 [1 :to 9]]])
 
 #"^([0-9]{4})-W(5[0-3]|[1-4][0-9]|0[1-9])$"
 
-(pre
-  [:capture [:digits 4 :times] :when :at-start] "-W"
-  [:capture [5 [0 :to 3] :or [1 :to 4] [0 :to 9] :or [1 :to 9]] :when :at-end])
-
-#"^(?<year>[0-9]{4})-(?<month>1[0-2]|0[1-9])$"
-
-(pre
-  [:capture [:digitss 4 :times] :with-name "year"]
-  "-"
-  [:capture [1 [0 :to 2] :or 0 [1 :to 9]] :when :at-end :with-name "month"])
+(pre [:c [[0 :to 9] :atleast 4] :when :at-start]
+     "-W"
+     [:c [5 [0 :to 3] :or [1 :to 4] [0 :to 9] :or 0 [1 :to 9]] :when :at-end])
 ```
 
 ```clojure
 #"(?<=>)[\s\S]*?(?=<)"
-
 (pre
-  [:match [:everything] :lazily :between "<" :and ">"])
+  [:match [:everything] :lazily :between ">" :and "<"])
+
 
 #"^[A-Z]{1,2}[0-9R][0-9A-Z]?[0-9][ABD-HJLNP-UW-Z]{2}$"
-
-(pre
-  [:match [:upper :between 1 :to 2 :times] :when :at-start] ; ^[A-Z]{1,2}
-  [:match [:digits "R"]] ;[0-9R]
-  [:match [:digitss :upper] :0-or-1 :times] ; [0-9A-Z]?
-  [:match [:digitss]] ;[0-9]
-  [:match ["AB" ["D" :to "H"] "JLN" ["P" :to "U"] ["W" :to "Z"]] 2 :times :when :at-end]) ; [ABD-HJLNP-UW-Z]{2}$
-
+(pre [:m :upper :between 1 :and 2 :when :at-start]
+     [:m [[[0 :to 9] "R"]]]
+     [:m [[[0 :to 9] :upper]] :0-or-1]
+     [:m [[[0 :to 9]]]]
+     [:m [["AB" ["D" :to "H"] "JLN" ["P" :to "U"] ["W" :to "Z"]]]
+      :atleast 2 :when :at-end])
 
 ```
 
