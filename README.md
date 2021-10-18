@@ -1,4 +1,5 @@
 # luna
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.abhinav/luna.svg)](https://clojars.org/org.clojars.abhinav/luna)
 
 No more regrets, wield the power of regex with the readability of English with luna.
 
@@ -11,6 +12,20 @@ Beta but don't let this discourage you from using it, it has a good test suite a
 
 Readable code can be hard to maintain. Unreadable code can be impossible to maintain.
 
+# Installing and Using
+add this to your project.clj file
+```clojure
+:dependencies [[org.clojars.abhinav/luna "0.1.0-SNAPSHOT"]]
+```
+Luna has one function `pre` that does the heavy lifting.
+```clojure
+;; import it
+(ns user.core
+  (:require [luna.core :as luna]))
+
+(luna/pre [:match ["x" :digits :atleast 4] :when :at-start])
+;;=> #"^x\d{4,}"
+```
 # Contributing
 
 I welcome contributions, even from first-timers. Feedbacks and suggestions are welcome too.
