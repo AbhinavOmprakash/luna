@@ -163,6 +163,10 @@
                  "-"
                  [:c [1 [0 :to 2] :or 0 [1 :to 9]]])))
 
+  (is (r-eq #"^([0-9]{4})-W(5[0-3]|[1-4][0-9]|0[1-9])$"
+            (pre [:c [[0 :to 9] :atleast 4] :when :at-start]
+                 "-W"
+                 [:c [5 [0 :to 3] :or [1 :to 4] [0 :to 9] :or 0 [1 :to 9]] :when :at-end])))
 
   (is (r-eq #"^[A-Z0-9+_.-]+@[A-Z0-9.-]+$"
             (pre [:m [[["A" :to "Z"] [0 :to 9] "+_.-"]] :greedily-1 :when :at-start]
