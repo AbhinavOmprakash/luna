@@ -23,7 +23,7 @@ Luna has one function `pre` that does the heavy lifting.
 (ns user.core
   (:require [luna.core :as luna]))
 
-(luna/pre [:match ["x" :digits :atleast 4] :when :at-start])
+(luna/pre [:match ["x" :digits :atleast 4 :times] :when :at-start])
 ;;=> #"^x\d{4,}"
 ```
 # Contributing
