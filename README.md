@@ -1,6 +1,6 @@
 # luna
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.abhinav/luna.svg)](https://clojars.org/org.clojars.abhinav/luna)
-
+[![codecov](https://codecov.io/gh/AbhinavOmprakash/luna/branch/master/graph/badge.svg?token=40ZSIXXSE3)](https://codecov.io/gh/AbhinavOmprakash/luna)
 No more regrets, wield the power of regex with the readability of English with luna.
 
 # About
