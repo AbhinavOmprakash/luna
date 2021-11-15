@@ -1,4 +1,4 @@
-(defproject org.clojars.abhinav/luna "0.1.0-SNAPSHOT"
+(defproject org.clojars.abhinav/luna "0.1.1"
   :description "A Domain Specific Language (DSL) that translates to regex."
   :url "https://github.com/AbhinavOmprakash/luna"
   :license {:name "MIT"
