@@ -33,6 +33,7 @@
                              :atmost
                              :between
                              :lazily
+                             :exactly
                              :lazily-1
                              :greedily
                              :greedily-1
@@ -68,6 +69,8 @@
 (defmethod add-quantifier :between
   [_ lower upper] (format "{%s,%s}" lower, upper))
 
+(defmethod add-quantifier :exactly
+  [_ exact] (format "{%s}" exact))
 
 (defmethod add-quantifier :lazily
   ([_ char] [char "*?"]))
@@ -163,7 +166,7 @@
              (some #{:atmost} t)))
     (vector (first t)
             (add-quantifier :between (nth t 2) (nth t 4)))
-    (some #{:atleast :atmost} t)
+    (some #{:atleast :atmost :exactly} t)
     (vector (first t)
             (add-quantifier (nth t 1) (nth t 2)))
     (some quantifiers t)
@@ -228,7 +231,7 @@
               (conj res [(char char-classes)])
 
               (and (int? char)
-                   (not (common? #{:atleast :atmost :between} (last res))))
+                   (not (common? #{:atleast :atmost :between :exactly} (last res))))
               ; if the previous token contains a quantifier,
               ; that means this int belongs inside that,
               ; else it is separate token
@@ -393,3 +396,4 @@
        (map regify)
        (apply str)
        Pattern/compile))
+
