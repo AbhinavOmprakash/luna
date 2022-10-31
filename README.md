@@ -236,7 +236,7 @@ note: the `:times` can be omitted if you want but it helps with readability
 [:match ["x"] :atleast 3] ; #"x{3,}"
 
 [:match ["x"] :atmost 3 :times] ; #"x{0,3}"
-
+[:match ["x"] :exactly 3 :times] ; #"x{3}"
 ;; Combining both
 [:match ["x"] :atleast 3 :atmost 5 :times] ; #"x{3,5}
 [:match ["x"] :between 3 :to 5 :times] ;  #"x{3,5}
