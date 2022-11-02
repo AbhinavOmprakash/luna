@@ -347,12 +347,12 @@
     (add-set-action set-action chars)))
 
 (defmulti ^:private regify
-          "Takes in a string, regex.Pattern or a vector with the Luna DSL.
+  "Takes in a string, regex.Pattern or a vector with the Luna DSL.
           If a regex.Pattern is passed then it will be converted to a string.
           If a vector is passed, it will be evaluated to form a string.
           Returns a string."
-          (fn [x]
-            (type x)))
+  (fn [x]
+    (class x)))
 
 (defmethod regify String [x] x)
 
