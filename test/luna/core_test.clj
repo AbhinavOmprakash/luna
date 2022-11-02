@@ -7,6 +7,19 @@
   [a b]
   (= (str a) (str b)))
 
+(def regify #'luna.core/regify)
+
+(deftest test-regify
+  (is (= (regify "x")
+         "x"))
+  (is (= (regify #"x")
+         "x"))
+  (is (= (regify :or)
+         "|"))
+  (is (thrown? IllegalArgumentException (regify :x)))
+  (is (= (regify [:match "x"])
+         "x")))
+
 (deftest test-pre
   (testing "plain strings passed to pre render to regex.Patterns")
   (is (r-eq #"a" (pre "a")))
@@ -55,12 +68,12 @@
   (is (r-eq #"^ab$^\d" (pre [:match ["a" :when :at-start "b" :when :at-end :digits :when :at-start]])))
 
   (testing "match with quantifiers"
-  (is (r-eq #"a{5}" (pre [:match ["a" :exactly 5 :times]])))
-  (is (r-eq #"a{5,}" (pre [:match ["a" :atleast 5 :times]])))
-  (is (r-eq #"a{0,5}" (pre [:match ["a" :atmost 5 :times]])))
-  (is (r-eq #"a{5,}b" (pre [:match ["a" :atleast 5 :times "b"]])))
-  (is (r-eq #"a{0,5}b" (pre [:match ["a" :atmost 5 :times "b"]])))
-  (is (r-eq #"a{2,5}" (pre [:match ["a" :between 2 :and 5 :times]]))))
+    (is (r-eq #"a{5}" (pre [:match ["a" :exactly 5 :times]])))
+    (is (r-eq #"a{5,}" (pre [:match ["a" :atleast 5 :times]])))
+    (is (r-eq #"a{0,5}" (pre [:match ["a" :atmost 5 :times]])))
+    (is (r-eq #"a{5,}b" (pre [:match ["a" :atleast 5 :times "b"]])))
+    (is (r-eq #"a{0,5}b" (pre [:match ["a" :atmost 5 :times "b"]])))
+    (is (r-eq #"a{2,5}" (pre [:match ["a" :between 2 :and 5 :times]]))))
 
   (testing "match with :or in char class vectors")
   (is (r-eq #"ab|c" (pre [:match ["a" "b" :or "c"]])))
