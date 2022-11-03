@@ -2,7 +2,9 @@
   (:import (java.util.regex Pattern)
            (clojure.lang PersistentVector Keyword))
   (:require [clojure.set :as s]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [clojure.walk :refer [postwalk]]))
+
 
 (def ^:private char-classes
   (into {}
@@ -361,8 +363,9 @@
 (defmethod regify Keyword [x]
   (if (= :or x)
     "|"
-    (throw (IllegalArgumentException. "unrecognized argument.\nDid you mean :or ?"))))
+    x))
 
+(defmethod regify :default [x] x)
 
 (defmethod regify PersistentVector [[type chars & mods]]
   (cond
@@ -393,7 +396,13 @@
    ```"
   [& xs]
   (->> xs
-       (map regify)
+       (postwalk (fn [x]
+                   (cond
+                     (and (vector? x)
+                          (#{:m :match :match-enc :c :capture} (first x)))
+                     (regify x)
+                     (vector? x) x
+                     :else  (regify x))))
        (apply str)
        Pattern/compile))
 

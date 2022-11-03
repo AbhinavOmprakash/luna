@@ -16,7 +16,7 @@
          "x"))
   (is (= (regify :or)
          "|"))
-  (is (thrown? IllegalArgumentException (regify :x)))
+  #_(is (thrown? IllegalArgumentException (regify :x)))
   (is (= (regify [:match "x"])
          "x")))
 
@@ -193,5 +193,10 @@
                   :atleast 2 :when :at-end]))))
 
 
-
-
+(deftest test-pre-can-handle-recursively-defined-regexes
+  (let [digits-4 [:match [:digits :exactly 4 :times]]
+        alphabets-5 [:match [:alpha :exactly 5 :times]]]
+    (is (r-eq #"\d{4}[a-zA-Z]{5}"
+              (pre [:match [digits-4 alphabets-5]])))
+    (is (r-eq #"(\d{4}[a-zA-Z]{5})"
+              (pre [:capture [digits-4 alphabets-5]])))))
